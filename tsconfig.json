@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",              // Or "esnext"
+    "moduleResolution": "node",        // ✅ classic Node-style, no .js needed
+    "target": "ES2021",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  }
+}

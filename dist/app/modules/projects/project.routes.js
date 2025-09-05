@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const project_controller_1 = require("./project.controller");
+const upload_1 = require("../../../middleware/upload");
+const router = (0, express_1.Router)();
+router.post('/', upload_1.upload.single('timelinePhoto'), project_controller_1.createProject);
+router.get('/', project_controller_1.listProjects);
+router.get('/:id', project_controller_1.getProject);
+exports.default = router;

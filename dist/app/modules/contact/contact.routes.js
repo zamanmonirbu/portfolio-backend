@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const contact_controller_1 = require("./contact.controller");
+const router = (0, express_1.Router)();
+router.post('/', contact_controller_1.submitContact);
+router.get('/', contact_controller_1.allContacts);
+router.post('/reply/:id', contact_controller_1.replyContact);
+router.get('/:id', contact_controller_1.getContact);
+exports.default = router;
