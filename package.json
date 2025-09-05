@@ -2,7 +2,6 @@
   "name": "ts-express-modular",
   "version": "1.0.0",
   "main": "dist/server.js",
-  "type": "module",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",

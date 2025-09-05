@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "module": "commonjs",              // Or "esnext"
-    "moduleResolution": "node",        // ✅ classic Node-style, no .js needed
+    "module": "commonjs",              
+    "moduleResolution": "node",        
     "target": "ES2021",
     "esModuleInterop": true,
     "resolveJsonModule": true,
