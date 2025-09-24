@@ -20,7 +20,7 @@ app.get('/', (_req, res) => {
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-app.use('/api', router);
+app.use('/api/v1', router);
 
 // 404
 app.use((req, res) => {

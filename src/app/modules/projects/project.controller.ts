@@ -28,6 +28,8 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
     timelinePhoto: `/uploads/${req.file.filename}`, // store relative path
   });
 
+  console.log(project);
+
   res
     .status(httpStatus.CREATED)
     .json(generateResponse(true, project, 'Project created successfully'));
