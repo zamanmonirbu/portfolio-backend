@@ -15,6 +15,7 @@ const projectSchema = z.object({
 });
 
 export const createProject = asyncHandler(async (req: Request, res: Response) => {
+  
   const body = projectSchema.parse(req.body);
 
   if (!req.file) {
@@ -27,8 +28,6 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
     ...body,
     timelinePhoto: `/uploads/${req.file.filename}`, // store relative path
   });
-
-  console.log(project);
 
   res
     .status(httpStatus.CREATED)
@@ -52,4 +51,40 @@ export const getProject = asyncHandler(async (req: Request, res: Response) => {
   }
 
   res.json(generateResponse(true, project, 'Project fetched'));
+});
+
+export const updateProject = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const body = projectSchema.partial().parse(req.body); // allow partial updates
+
+  let timelinePhotoPath: string | undefined;
+  if (req.file) {
+    timelinePhotoPath = `/uploads/${req.file.filename}`;
+  }
+
+  const updatedProject = await ProjectService.update(id, {
+    ...body,
+    ...(timelinePhotoPath && { timelinePhoto: timelinePhotoPath }),
+  });
+
+  if (!updatedProject) {
+    return res
+      .status(httpStatus.NOT_FOUND)
+      .json(generateResponse(false, null, 'Project not found'));
+  }
+
+  res.json(generateResponse(true, updatedProject, 'Project updated successfully'));
+});
+
+export const deleteProject = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const deleted = await ProjectService.delete(id);
+
+  if (!deleted) {
+    return res
+      .status(httpStatus.NOT_FOUND)
+      .json(generateResponse(false, null, 'Project not found'));
+  }
+
+  res.json(generateResponse(true, null, 'Project deleted successfully'));
 });

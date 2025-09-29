@@ -76,6 +76,23 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 
+export const myProfile = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
 
-// "rootDir": "src",
-//     "outDir": "dist"
+  if (!userId) {
+    return res
+      .status(httpStatus.UNAUTHORIZED)
+      .json(generateResponse(false, null, 'Unauthorized'));
+  }
+
+  const user = await UserService.findById(userId);
+  if (!user) {
+    return res
+      .status(httpStatus.NOT_FOUND)
+      .json(generateResponse(false, null, 'User not found'));
+  }
+
+  const { password, ...safe } = user.toObject();
+  res.json(generateResponse(true, safe, 'Profile fetched'));
+});
+

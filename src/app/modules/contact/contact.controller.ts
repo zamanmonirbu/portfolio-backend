@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import { generateResponse } from '../../../utils/generateResponse';
 import { ContactService } from './contact.service';
-import { mailer } from '../../../core/mail';
-import { env } from '../../../core/env';
+import env  from '../../../core/env';
+import sendMailer from '../../../core/mail';
 
 
 const contactSchema = z.object({
@@ -48,7 +48,6 @@ export const getContact = asyncHandler(async (req: Request, res: Response) => {
 
 
 export const replyContact = asyncHandler(async (req: Request, res: Response) => { 
-
   const { id } = req.params;
   const { replyMessage } = req.body;
 
@@ -66,13 +65,8 @@ export const replyContact = asyncHandler(async (req: Request, res: Response) => 
       .json(generateResponse(false, null, 'Contact not found'));
   }
 
-  // Send email
-  await mailer.sendMail({
-    from: env.MAIL_FROM,
-    to: contact.email,
-    subject: `Re: ${contact.subject}`,
-    text: replyMessage,
-  });
+  // Use your sendMailer utility
+  await sendMailer(contact.email, `Re: ${contact.subject}`, replyMessage);
 
   res.json(generateResponse(true, null, 'Reply sent successfully'));
 });

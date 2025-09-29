@@ -1,3 +1,4 @@
+import { findSourceMap } from 'module';
 import { User } from './user.model';
 import type { IUser } from './user.model';
 
@@ -13,5 +14,11 @@ export const UserService = {
 
   findByEmail(email: string) {
     return User.findOne({ email }).select('+password');
+  },
+
+  findById(id: string) {
+    return User.findById(id).select('-password');
   }
+
+
 };

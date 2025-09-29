@@ -12,5 +12,16 @@ export const ProjectService = {
 
   findById(id: string) {
     return Project.findById(id).lean();
-  }
+  },
+
+  // ✅ FIXED update
+  update(id: string, payload: Partial<IProjectAttrs>) {
+    return Project.findByIdAndUpdate(id, payload, { new: true }).lean();
+  },
+
+  // ✅ FIXED delete
+  async delete(id: string) {
+    const result = await Project.findByIdAndDelete(id).lean();
+    return result !== null;
+  },
 };
