@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { createBlog, listBlogs, getBlog, updateBlog, deleteBlog } from './activity.controller';
+import { getActivity } from './activity.controller';
+import { authenticateUser } from '../../../middleware/validateUser';
 
 const router = Router();
 
-router.post('/', createBlog);
-router.get('/', listBlogs);
-router.get('/:id', getBlog);
-router.put('/:id', updateBlog);
-router.delete('/:id', deleteBlog);
+router.get('/',authenticateUser, getActivity);
 
 export default router;
+

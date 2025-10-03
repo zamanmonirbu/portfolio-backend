@@ -1,10 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import slugify from 'slugify';
 
 export interface IBlogAttrs {
   title: string;
   content: string;
   excerpt?: string;
-  slug: string;
+  slug?: string;
   published: boolean;
   author?: string;
   tags?: string[];

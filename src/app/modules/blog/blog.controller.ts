@@ -1,43 +1,53 @@
-import type { Request, Response } from "express";
-import httpStatus from "http-status";
-import { z } from "zod";
-import { asyncHandler } from "../../../utils/asyncHandler";
-import { generateResponse } from "../../../utils/generateResponse";
-import { BlogService } from "./blog.service";
-import { logActivity } from "../../../utils/activityLogger";
+import type { Request, Response } from 'express';
+import httpStatus from 'http-status';
+import { asyncHandler } from '../../../utils/asyncHandler';
+import { generateResponse } from '../../../utils/generateResponse';
+import { BlogService } from './blog.service';
 
-const createBlogSchema = z.object({
-  title: z.string().min(1),
-  content: z.string().min(1),
+import { z } from 'zod';
+
+export const createBlogSchema = z.object({
+  title: z.string(),
+  content: z.string(),
   excerpt: z.string().optional(),
-  slug: z.string().min(1),
-  published: z.boolean(),
+  published: z.coerce.boolean(), // will convert "true"/"false" → boolean
   author: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z
+    .string()
+    .transform((val) => val.split(',').map((t) => t.trim()))
+    .optional(),
   featuredImage: z.string().optional(),
-  reader: z.number().optional(),
 });
 
-export const createBlog = asyncHandler(async (req: Request, res: Response) => {
-  const body = createBlogSchema.parse(req.body);
-  const blog = await BlogService.create(body);
 
-  // 🔥 Log activity
-  await logActivity({
-    userId: req.user?.id, // make sure `req.user` exists (e.g. from auth middleware)
-    action: "Created Blog",
-    details: `Blog titled "${blog.title}" created`,
-    req,
-  });
+export const createBlog = asyncHandler(async (req: Request, res: Response) => {
+  // Convert form-data strings into correct types
+  const modifiedBody = {
+    ...req.body,
+    published: req.body.published === 'true', // string -> boolean
+    tags: req.body.tags
+      ? req.body.tags.split(',').map((tag: string) => tag.trim()) // string -> array
+      : [],
+  };
+
+  // validate with zod schema
+  const body = createBlogSchema.parse(modifiedBody);
+
+  // handle image
+  if (req.file?.filename) {
+    body.featuredImage = req.file.filename;
+  }
+
+  const blog = await BlogService.create(body);
 
   res
     .status(httpStatus.CREATED)
-    .json(generateResponse(true, blog, "Blog created successfully"));
+    .json(generateResponse(true, blog, 'Blog created successfully'));
 });
 
 export const listBlogs = asyncHandler(async (_req: Request, res: Response) => {
   const blogs = await BlogService.list();
-  res.json(generateResponse(true, blogs, "Blogs fetched successfully"));
+  res.json(generateResponse(true, blogs, 'Blogs fetched successfully'));
 });
 
 export const getBlog = asyncHandler(async (req: Request, res: Response) => {
@@ -45,13 +55,14 @@ export const getBlog = asyncHandler(async (req: Request, res: Response) => {
   const blog = await BlogService.findByIdAndIncrement(id);
 
   if (!blog) {
-    return res
-      .status(httpStatus.NOT_FOUND)
-      .json(generateResponse(false, null, "Blog not found"));
+    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
   }
 
-  res.json(generateResponse(true, blog, "Blog fetched successfully"));
+  res.json(generateResponse(true, blog, 'Blog fetched successfully'));
 });
+
+//Just comment
+
 
 export const updateBlog = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -59,20 +70,10 @@ export const updateBlog = asyncHandler(async (req: Request, res: Response) => {
 
   const updated = await BlogService.update(id, body);
   if (!updated) {
-    return res
-      .status(httpStatus.NOT_FOUND)
-      .json(generateResponse(false, null, "Blog not found"));
+    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
   }
 
-  // 🔥 Log activity
-  await logActivity({
-    userId: req.user?.id,
-    action: "Updated Blog",
-    details: `Blog titled "${updated.title}" updated`,
-    req,
-  });
-
-  res.json(generateResponse(true, updated, "Blog updated successfully"));
+  res.json(generateResponse(true, updated, 'Blog updated successfully'));
 });
 
 export const deleteBlog = asyncHandler(async (req: Request, res: Response) => {
@@ -80,18 +81,8 @@ export const deleteBlog = asyncHandler(async (req: Request, res: Response) => {
   const deleted = await BlogService.delete(id);
 
   if (!deleted) {
-    return res
-      .status(httpStatus.NOT_FOUND)
-      .json(generateResponse(false, null, "Blog not found"));
+    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
   }
 
-  // 🔥 Log activity
-  await logActivity({
-    userId: req.user?.id,
-    action: "Deleted Blog",
-    details: `Blog with id "${id}" deleted`,
-    req,
-  });
-
-  res.json(generateResponse(true, null, "Blog deleted successfully"));
+  res.json(generateResponse(true, null, 'Blog deleted successfully'));
 });
