@@ -5,9 +5,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.connectDB = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
-const env_1 = require("./env");
+const env_1 = __importDefault(require("./env"));
 const connectDB = async () => {
-    await mongoose_1.default.connect(env_1.env.MONGO_URI);
+    if (!env_1.default.mongoUri) {
+        throw new Error('MongoDB URI is not defined in environment variables.');
+    }
+    await mongoose_1.default.connect(env_1.default.mongoUri);
     console.log('MongoDB connected');
 };
 exports.connectDB = connectDB;

@@ -11,5 +11,8 @@ exports.UserService = {
     },
     findByEmail(email) {
         return user_model_1.User.findOne({ email }).select('+password');
+    },
+    findById(id) {
+        return user_model_1.User.findById(id).select('-password');
     }
 };

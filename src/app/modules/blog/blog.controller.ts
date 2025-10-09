@@ -10,13 +10,10 @@ export const createBlogSchema = z.object({
   title: z.string(),
   content: z.string(),
   excerpt: z.string().optional(),
-  published: z.coerce.boolean(), // will convert "true"/"false" → boolean
+  published: z.coerce.boolean(), 
   author: z.string().optional(),
-  tags: z
-    .string()
-    .transform((val) => val.split(',').map((t) => t.trim()))
-    .optional(),
-  featuredImage: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  featuredImage: z.string().optional(), 
 });
 
 
@@ -32,6 +29,7 @@ export const createBlog = asyncHandler(async (req: Request, res: Response) => {
 
   // validate with zod schema
   const body = createBlogSchema.parse(modifiedBody);
+  // const body=req.body;
 
   // handle image
   if (req.file?.filename) {

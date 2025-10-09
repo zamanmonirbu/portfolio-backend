@@ -2,9 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const contact_controller_1 = require("./contact.controller");
+const validateUser_1 = require("../../../middleware/validateUser");
 const router = (0, express_1.Router)();
 router.post('/', contact_controller_1.submitContact);
-router.get('/', contact_controller_1.allContacts);
-router.post('/reply/:id', contact_controller_1.replyContact);
+router.get('/', validateUser_1.authenticateUser, contact_controller_1.allContacts);
+router.post('/reply/:id', validateUser_1.authenticateUser, contact_controller_1.replyContact);
 router.get('/:id', contact_controller_1.getContact);
 exports.default = router;
