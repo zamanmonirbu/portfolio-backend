@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { createUser, listUsers, loginUser,myProfile } from './user.controller';
+import { getAdminProfile,myProfile, updateMyProfile } from './user.controller';
 import { authenticateUser } from '../../../middleware/validateUser';
+import { upload } from '../../../middleware/upload';
 
 const router = Router();
 
-router.post('/register', createUser);
-router.get('/', listUsers);
-router.get('/me',authenticateUser, myProfile);
-router.post('/login', loginUser); 
+router.get('/me', authenticateUser, myProfile);
+router.put('/me', authenticateUser, upload.single('profile'), updateMyProfile);
+router.get('/:email', getAdminProfile);
 
 export default router;

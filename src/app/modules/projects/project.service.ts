@@ -7,7 +7,7 @@ export const ProjectService = {
   },
 
   list() {
-    return Project.find().lean();
+    return Project.find().sort({ createdAt: -1 }).limit(5).lean();
   },
 
   findById(id: string) {

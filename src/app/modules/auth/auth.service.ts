@@ -1,5 +1,6 @@
-import { User } from './user.model';
-import type { IUser } from './user.model';
+import { findSourceMap } from 'module';
+import { User } from '../user/user.model';
+import type { IUser } from '../user/user.model';
 
 
 export const UserService = {
@@ -17,10 +18,7 @@ export const UserService = {
 
   findById(id: string) {
     return User.findById(id).select('-password');
-  },
-findByIdAndUpdate(id: string, payload: Partial<IUser>) {
-  return User.findByIdAndUpdate(id, payload, { new: true, runValidators: true }).select('-password');
-}
+  }
 
 
 };

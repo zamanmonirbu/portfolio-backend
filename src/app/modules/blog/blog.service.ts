@@ -1,23 +1,23 @@
-import { Blog, IBlogAttrs } from './blog.model';
-import slugify from 'slugify';
+import { Blog, IBlogAttrs } from "./blog.model";
+import slugify from "slugify";
 
 export const BlogService = {
   create(payload: IBlogAttrs) {
-    const dateTime = new Date().toISOString().slice(0, 19).replace(/T/g, '-').replace(/:/g, '');
-    const slug = slugify(`${payload.title}-${dateTime}`, { lower: true, strict: true });
+    const date = new Date().toISOString().replace(/[:.]/g, "");
+    const slug = slugify(`${payload.title}-${date}`, { lower: true, strict: true });
     return Blog.create({ ...payload, slug });
   },
 
   list() {
-    return Blog.find().lean();
+    return Blog.find().sort({ createdAt: -1 }).limit(5).lean();
   },
 
   findById(id: string) {
     return Blog.findById(id).lean();
   },
 
-  findBySlug(slug: string) {
-    return Blog.findOne({ slug }).lean();
+  findByIdAndIncrement(id: string) {
+    return Blog.findByIdAndUpdate(id, { $inc: { reader: 1 } }, { new: true }).lean();
   },
 
   update(id: string, payload: Partial<IBlogAttrs>) {
@@ -30,13 +30,5 @@ export const BlogService = {
   async delete(id: string) {
     const result = await Blog.findByIdAndDelete(id).lean();
     return result !== null;
-  },
-
-  findByIdAndIncrement(id: string) {
-    return Blog.findByIdAndUpdate(
-      id,
-      { $inc: { reader: 1 } },
-      { new: true }
-    ).lean();
   },
 };

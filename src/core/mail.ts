@@ -22,7 +22,6 @@ const sendMailer = async (
     html,
   });
 
-  console.log('Message sent:', info.messageId);
 };
 
 export default sendMailer;

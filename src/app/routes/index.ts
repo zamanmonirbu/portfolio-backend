@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRoutes from '../modules/auth/auth.routes';
 import userRoutes from '../modules/user/user.routes';
 import contactRoutes from '../modules/contact/contact.routes';
 import projectRoutes from '../modules/projects/project.routes';
@@ -8,7 +9,8 @@ import activityRoutes from '../modules/activity/activity.routes';
 
 export const router = Router();
 
-router.use('/users', userRoutes);
+router.use('/auth', authRoutes);
+router.use('/user', userRoutes);
 router.use('/contact', contactRoutes);
 router.use('/project', projectRoutes);
 router.use('/blog',blogRoutes);

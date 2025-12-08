@@ -1,5 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
-import slugify from 'slugify';
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IBlogAttrs {
   title: string;
@@ -10,6 +9,7 @@ export interface IBlogAttrs {
   author?: string;
   tags?: string[];
   featuredImage?: string;
+  cloudinaryId?: string;
   reader?: number;
 }
 
@@ -28,9 +28,10 @@ const BlogSchema = new Schema<IBlog>(
     author: String,
     tags: [String],
     featuredImage: String,
+    cloudinaryId: String,
     reader: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-export const Blog = mongoose.model<IBlog>('Blog', BlogSchema);
+export const Blog = mongoose.model<IBlog>("Blog", BlogSchema);

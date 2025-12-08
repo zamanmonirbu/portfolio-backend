@@ -1,86 +1,119 @@
-import type { Request, Response } from 'express';
-import httpStatus from 'http-status';
-import { asyncHandler } from '../../../utils/asyncHandler';
-import { generateResponse } from '../../../utils/generateResponse';
-import { BlogService } from './blog.service';
+import type { Request, Response } from "express";
+import httpStatus from "http-status";
+import { asyncHandler } from "../../../utils/asyncHandler";
+import { generateResponse } from "../../../utils/generateResponse";
+import { BlogService } from "./blog.service";
+import { z } from "zod";
+import cloudinary from "../../../utils/cloudinary";
 
-import { z } from 'zod';
-
-export const createBlogSchema = z.object({
+const blogSchema = z.object({
   title: z.string(),
   content: z.string(),
   excerpt: z.string().optional(),
-  published: z.coerce.boolean(), 
+  published: z.coerce.boolean(),
   author: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  featuredImage: z.string().optional(), 
 });
 
-
 export const createBlog = asyncHandler(async (req: Request, res: Response) => {
-  // Convert form-data strings into correct types
-  const modifiedBody = {
+  const parsed = blogSchema.parse({
     ...req.body,
-    published: req.body.published === 'true', // string -> boolean
-    tags: req.body.tags
-      ? req.body.tags.split(',').map((tag: string) => tag.trim()) // string -> array
-      : [],
-  };
+    tags: req.body.tags ? req.body.tags.split(",") : [],
+  });
 
-  // validate with zod schema
-  const body = createBlogSchema.parse(modifiedBody);
-  // const body=req.body;
-
-  // handle image
-  if (req.file?.filename) {
-    body.featuredImage = req.file.filename;
+  if (!req.file) {
+    return res.status(400).json(generateResponse(false, null, "Image required"));
   }
 
-  const blog = await BlogService.create(body);
+  const stream = cloudinary.uploader.upload_stream(
+    { folder: "blogs" },
+    async (error, result) => {
+      if (error) throw new Error("Cloudinary upload failed");
 
-  res
-    .status(httpStatus.CREATED)
-    .json(generateResponse(true, blog, 'Blog created successfully'));
+      const blog = await BlogService.create({
+        ...parsed,
+        featuredImage: result!.secure_url,
+        cloudinaryId: result!.public_id,
+      });
+
+      res
+        .status(httpStatus.CREATED)
+        .json(generateResponse(true, blog, "Blog created successfully"));
+    }
+  );
+
+  stream.end(req.file.buffer);
 });
 
 export const listBlogs = asyncHandler(async (_req: Request, res: Response) => {
   const blogs = await BlogService.list();
-  res.json(generateResponse(true, blogs, 'Blogs fetched successfully'));
+  res.json(generateResponse(true, blogs, "Blogs fetched"));
 });
 
 export const getBlog = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const blog = await BlogService.findByIdAndIncrement(id);
+  const blog = await BlogService.findByIdAndIncrement(req.params.id);
 
   if (!blog) {
-    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
+    return res.status(404).json(generateResponse(false, null, "Blog not found"));
   }
 
-  res.json(generateResponse(true, blog, 'Blog fetched successfully'));
+  res.json(generateResponse(true, blog, "Blog fetched"));
 });
-
-//Just comment
-
 
 export const updateBlog = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const body = createBlogSchema.partial().parse(req.body);
 
-  const updated = await BlogService.update(id, body);
-  if (!updated) {
-    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
+  const existing = await BlogService.findById(id);
+  if (!existing) {
+    return res.status(404).json(generateResponse(false, null, "Blog not found"));
   }
 
-  res.json(generateResponse(true, updated, 'Blog updated successfully'));
+  const body = blogSchema.partial().parse({
+    ...req.body,
+    tags: req.body.tags ? req.body.tags.split(",") : undefined,
+  });
+
+  let updateData: any = { ...body };
+
+  if (req.file) {
+    if (existing.cloudinaryId) {
+      await cloudinary.uploader.destroy(existing.cloudinaryId);
+    }
+
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "blogs" },
+      async (error, result) => {
+        if (error) throw new Error("Cloudinary upload failed");
+
+        updateData.featuredImage = result!.secure_url;
+        updateData.cloudinaryId = result!.public_id;
+
+        const updated = await BlogService.update(id, updateData);
+        res.json(generateResponse(true, updated, "Blog updated successfully"));
+      }
+    );
+
+    stream.end(req.file.buffer);
+    return;
+  }
+
+  const updated = await BlogService.update(id, updateData);
+  res.json(generateResponse(true, updated, "Blog updated successfully"));
 });
 
 export const deleteBlog = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const deleted = await BlogService.delete(id);
 
-  if (!deleted) {
-    return res.status(httpStatus.NOT_FOUND).json(generateResponse(false, null, 'Blog not found'));
+  const blog = await BlogService.findById(id);
+  if (!blog) {
+    return res.status(404).json(generateResponse(false, null, "Blog not found"));
   }
 
-  res.json(generateResponse(true, null, 'Blog deleted successfully'));
+  if (blog.cloudinaryId) {
+    await cloudinary.uploader.destroy(blog.cloudinaryId);
+  }
+
+  await BlogService.delete(id);
+
+  res.json(generateResponse(true, null, "Blog deleted successfully"));
 });
