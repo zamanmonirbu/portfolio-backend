@@ -39,9 +39,10 @@ const mongoose_1 = __importStar(require("mongoose"));
 const ProjectSchema = new mongoose_1.Schema({
     name: { type: String, required: true },
     description: String,
-    timelinePhoto: { type: String, required: true },
     liveLink: { type: String, required: true },
     frontendCode: { type: String, required: true },
     backendCode: { type: String, required: true },
+    timelinePhoto: { type: String },
+    cloudinaryId: { type: String },
 }, { timestamps: true });
 exports.Project = mongoose_1.default.model('Project', ProjectSchema);

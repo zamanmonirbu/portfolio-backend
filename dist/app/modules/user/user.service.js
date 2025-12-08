@@ -14,5 +14,8 @@ exports.UserService = {
     },
     findById(id) {
         return user_model_1.User.findById(id).select('-password');
+    },
+    findByIdAndUpdate(id, payload) {
+        return user_model_1.User.findByIdAndUpdate(id, payload, { new: true, runValidators: true }).select('-password');
     }
 };

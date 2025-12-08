@@ -43,15 +43,56 @@ const UserSchema = new mongoose_1.Schema({
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6 },
-}, { timestamps: { createdAt: true, updatedAt: true } });
+    profilePicture: { type: String, default: '' },
+    cloudinaryId: { type: String },
+    bio: { type: String, default: '' },
+    socialLinks: [
+        {
+            platform: { type: String, required: true },
+            url: { type: String, required: true },
+            icon: { type: String },
+        },
+    ],
+    about: { type: String, default: '' },
+    workExperience: [
+        {
+            title: String,
+            designation: String,
+            location: String,
+            timePeriod: String,
+            details: String,
+        },
+    ],
+    education: [
+        {
+            institution: String,
+            degree: String,
+            timePeriod: String,
+        },
+    ],
+    skills: [String],
+}, { timestamps: true });
+// Hash password
 UserSchema.pre('save', async function (next) {
     if (!this.isModified('password'))
         return next();
-    const salt = await bcryptjs_1.default.genSalt(10);
-    this.password = await bcryptjs_1.default.hash(this.password, salt);
+    this.password = await bcryptjs_1.default.hash(this.password, await bcryptjs_1.default.genSalt(10));
     next();
 });
+// Compare password
 UserSchema.methods.comparePassword = function (candidate) {
     return bcryptjs_1.default.compare(candidate, this.password);
 };
+// Cloudinary cleanup
+UserSchema.pre('deleteOne', { document: true, query: false }, async function () {
+    if (this.cloudinaryId) {
+        try {
+            const cloudinary = (await Promise.resolve().then(() => __importStar(require('../../../utils/cloudinary')))).default;
+            await cloudinary.uploader.destroy(this.cloudinaryId);
+        }
+        catch (err) {
+            console.error('Cloudinary cleanup failed:', err);
+        }
+    }
+});
 exports.User = mongoose_1.default.model('User', UserSchema);

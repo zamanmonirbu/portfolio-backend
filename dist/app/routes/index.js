@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.router = void 0;
 const express_1 = require("express");
+const auth_routes_1 = __importDefault(require("../modules/auth/auth.routes"));
 const user_routes_1 = __importDefault(require("../modules/user/user.routes"));
 const contact_routes_1 = __importDefault(require("../modules/contact/contact.routes"));
 const project_routes_1 = __importDefault(require("../modules/projects/project.routes"));
@@ -12,7 +13,8 @@ const blog_routes_1 = __importDefault(require("../modules/blog/blog.routes"));
 const reader_routes_1 = __importDefault(require("../modules/reader/reader.routes"));
 const activity_routes_1 = __importDefault(require("../modules/activity/activity.routes"));
 exports.router = (0, express_1.Router)();
-exports.router.use('/users', user_routes_1.default);
+exports.router.use('/auth', auth_routes_1.default);
+exports.router.use('/user', user_routes_1.default);
 exports.router.use('/contact', contact_routes_1.default);
 exports.router.use('/project', project_routes_1.default);
 exports.router.use('/blog', blog_routes_1.default);

@@ -7,7 +7,7 @@ exports.ProjectService = {
         return project_model_1.Project.create(payload);
     },
     list() {
-        return project_model_1.Project.find().lean();
+        return project_model_1.Project.find().sort({ createdAt: -1 }).limit(5).lean();
     },
     findById(id) {
         return project_model_1.Project.findById(id).lean();
