@@ -1,59 +1,217 @@
 // project.controller.ts
-import type { Request, Response } from "express";
+import { Request, Response } from "express";
 import httpStatus from "http-status";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import { generateResponse } from "../../../utils/generateResponse";
 import { ProjectService } from "./project.service";
 import { z } from "zod";
-import { logActivity } from "../../../utils/activityLogger";
 import cloudinary from "../../../utils/cloudinary";
-import { IProject } from "./project.model";
 
+// --------------------
+// ZOD VALIDATION
+// --------------------
 const projectSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
-  liveLink: z.string().url(),
-  frontendCode: z.string().url(),
-  backendCode: z.string().url(),
-  timelinePhoto: z.string().optional(),
-  cloudinaryId: z.string().optional(),
+  liveLink: z.string().url("Invalid live link URL"),
+  frontendCode: z.string().url("Invalid frontend code URL"),
+  backendCode: z.string().url("Invalid backend code URL"),
+  videoLink: z.string().url().optional(),
+  technologies: z.array(z.string()).optional(),
 });
 
+type UploadResult = {
+  secure_url: string;
+  public_id: string;
+};
 
+// --------------------
+// CLOUDINARY UPLOAD HELPER
+// --------------------
+const uploadToCloudinary = (file: Express.Multer.File): Promise<UploadResult> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "projects" },
+      (error, result) => {
+        if (error || !result) reject(error || new Error("Upload failed"));
+        else resolve(result as UploadResult);
+      }
+    );
+    stream.end(file.buffer);
+  });
+};
 
-export const createProject = asyncHandler(async (req, res) => {
-  const body = projectSchema.parse(req.body);
+// --------------------
+// SAFE JSON PARSER
+// --------------------
+function safeParse(value: any): any {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
 
-  if (!req.file) {
-    return res.status(400).json(generateResponse(false, null, "Timeline photo is required"));
+// --------------------
+// CREATE PROJECT
+// --------------------
+export const createProject = asyncHandler(async (req: Request, res: Response) => {
+  // Parse JSON fields first
+  const rawData = {
+    ...req.body,
+    technologies: safeParse(req.body.technologies),
+  };
+
+  // Validate
+  const parseResult = projectSchema.safeParse(rawData);
+  if (!parseResult.success) {
+    return res.status(400).json(
+      generateResponse(false, null, parseResult.error.errors[0].message)
+    );
   }
 
-  const stream = cloudinary.uploader.upload_stream(
-    { folder: "projects" },
-    async (error, result) => {
-      if (error) throw new Error(error.message);
-      if (!result) throw new Error("Cloudinary returned empty result");
+  const parsed = parseResult.data;
 
-      const project = await ProjectService.create({
-        ...body,
-        timelinePhoto: result.secure_url,
-        cloudinaryId: result.public_id,
-      });
+  // Extract files (multer.fields)
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const timelinePhotoFile = files?.timelinePhoto?.[0];
+  const otherPhotosFiles = files?.otherPhotos || [];
 
-      res.status(201).json(generateResponse(true, project, "Project created successfully"));
-    }
+  if (!timelinePhotoFile && otherPhotosFiles.length === 0) {
+    return res
+      .status(400)
+      .json(generateResponse(false, null, "At least one image is required"));
+  }
+
+  // Upload timeline photo
+  const timelinePhoto = timelinePhotoFile
+    ? await uploadToCloudinary(timelinePhotoFile)
+    : null;
+
+  // Upload other photos
+  const otherPhotos = await Promise.all(
+    otherPhotosFiles.map((file: Express.Multer.File) =>
+      uploadToCloudinary(file)
+    )
   );
 
-  stream.end(req.file.buffer);
+  const project = await ProjectService.create({
+    ...parsed,
+
+    timelinePhoto: timelinePhoto?.secure_url || undefined,
+    timelinePhotoCloudinaryId: timelinePhoto?.public_id || undefined,
+
+    otherPhotos: otherPhotos.map((p) => p.secure_url),
+    otherPhotosCloudinaryIds: otherPhotos.map((p) => p.public_id),
+  });
+
+  res
+    .status(201)
+    .json(generateResponse(true, project, "Project created successfully"));
 });
 
+// --------------------
+// UPDATE PROJECT
+// --------------------
+export const updateProject = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
 
+  // Parse JSON fields
+  const rawData = {
+    ...req.body,
+    technologies: safeParse(req.body.technologies),
+  };
 
+  const parseResult = projectSchema.partial().safeParse(rawData);
+  if (!parseResult.success) {
+    return res.status(400).json(
+      generateResponse(false, null, parseResult.error.errors[0].message)
+    );
+  }
+
+  const existing = await ProjectService.findById(id);
+  if (!existing) {
+    return res.status(404).json(generateResponse(false, null, "Project not found"));
+  }
+
+  const updateData: any = { ...parseResult.data };
+  // Replace timeline photo
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const timelinePhotoFile = files?.timelinePhoto?.[0];
+  const otherPhotosFiles = files?.otherPhotos || [];
+
+  if (timelinePhotoFile) {
+    if (existing.timelinePhotoCloudinaryId) {
+      await cloudinary.uploader.destroy(existing.timelinePhotoCloudinaryId);
+    }
+    const result = await uploadToCloudinary(timelinePhotoFile);
+    updateData.timelinePhoto = result.secure_url;
+    updateData.timelinePhotoCloudinaryId = result.public_id;
+  }
+
+  // Replace other photos
+  if (otherPhotosFiles.length > 0) {
+    if (existing.otherPhotosCloudinaryIds?.length) {
+      await Promise.all(
+        existing.otherPhotosCloudinaryIds.map((id) =>
+          cloudinary.uploader.destroy(id)
+        )
+      );
+    }
+
+    const uploaded = await Promise.all(
+      otherPhotosFiles.map((file: Express.Multer.File) =>
+        uploadToCloudinary(file)
+      )
+    );
+
+    updateData.otherPhotos = uploaded.map((p) => p.secure_url);
+    updateData.otherPhotosCloudinaryIds = uploaded.map((p) => p.public_id);
+  }
+
+  const updated = await ProjectService.update(id, updateData);
+
+  res.json(generateResponse(true, updated, "Project updated successfully"));
+});
+
+// --------------------
+// DELETE PROJECT
+// --------------------
+export const deleteProject = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const project = await ProjectService.findById(id);
+  if (!project) {
+    return res.status(404).json(generateResponse(false, null, "Project not found"));
+  }
+
+  const idsToDelete = [
+    project.timelinePhotoCloudinaryId,
+    ...(project.otherPhotosCloudinaryIds || []),
+  ].filter(Boolean) as string[];
+
+  await Promise.all(idsToDelete.map((id) => cloudinary.uploader.destroy(id)));
+
+  await ProjectService.delete(id);
+
+  res.json(generateResponse(true, null, "Project deleted successfully"));
+});
+
+// --------------------
+// LIST PROJECTS
+// --------------------
 export const listProjects = asyncHandler(async (_req: Request, res: Response) => {
   const projects = await ProjectService.list();
   res.json(generateResponse(true, projects, "Projects fetched"));
 });
 
+// --------------------
+// GET PROJECT BY ID
+// --------------------
 export const getProject = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const project = await ProjectService.findById(id);
@@ -64,84 +222,5 @@ export const getProject = asyncHandler(async (req: Request, res: Response) => {
       .json(generateResponse(false, null, "Project not found"));
   }
 
-  // 🔥 Optional: Log activity for viewing a project
-  await logActivity({
-    userId: req.user?.id,
-    action: "Viewed Project",
-    details: `Project named "${project.name}" viewed`,
-    req,
-  });
-
   res.json(generateResponse(true, project, "Project fetched"));
-});
-
-export const updateProject = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const body = projectSchema.partial().parse(req.body);
-
-  const existing = await ProjectService.findById(id) as IProject | null;
-
-  if (!existing) {
-    return res.status(404).json(generateResponse(false, null, "Project not found"));
-  }
-
-  let updateData: any = { ...body };
-
-  if (req.file) {
-    // delete old image
-    if (existing.cloudinaryId) {
-      await cloudinary.uploader.destroy(existing.cloudinaryId);
-    }
-
-    // upload new
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: "projects" },
-      async (error, result) => {
-        if (error) throw new Error(error.message);
-        if (!result) throw new Error("Cloudinary returned empty result");
-
-        updateData.timelinePhoto = result.secure_url;
-        updateData.cloudinaryId = result.public_id;
-
-        const updatedProject = await ProjectService.update(id, updateData);
-
-        res.json(generateResponse(true, updatedProject, "Project updated successfully"));
-      }
-    );
-
-    stream.end(req.file.buffer);
-    return;
-  }
-
-  const updated = await ProjectService.update(id, updateData);
-  res.json(generateResponse(true, updated, "Project updated"));
-});
-
-
-
-export const deleteProject = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const project = await ProjectService.findById(id);
-  if (!project) {
-    return res.status(404).json(generateResponse(false, null, "Project not found"));
-  }
-
-  // delete cloudinary image
-  if (project.cloudinaryId) {
-    await cloudinary.uploader.destroy(project.cloudinaryId);
-  }
-
-
-  // delete db record
-  await ProjectService.delete(id);
-
-  await logActivity({
-    userId: req.user?.id,
-    action: "Deleted Project",
-    details: `Project "${project.name}" deleted`,
-    req,
-  });
-
-  res.json(generateResponse(true, null, "Project deleted successfully"));
 });

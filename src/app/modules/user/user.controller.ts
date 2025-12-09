@@ -28,6 +28,13 @@ const socialLinkSchema = z.object({
   icon: z.string().optional(),
 });
 
+const skillsSchema = z.array(
+  z.object({
+    skillTile: z.string().min(1, "Skill category is required"),
+    skillName: z.array(z.string().min(1, "Skill name cannot be empty")).min(1, "At least one skill required"),
+  })
+);
+
 // Full update schema
 const updateProfileSchema = z.object({
   name: z.string().optional(),
@@ -38,7 +45,8 @@ const updateProfileSchema = z.object({
   socialLinks: z.array(socialLinkSchema).optional(),
   workExperience: z.array(workExpSchema).optional(),
   education: z.array(educationSchema).optional(),
-  skills: z.array(z.string()).optional(),
+  skills: skillsSchema.optional(),
+logo: z.string().url().optional().or(z.literal("")),
 });
 
 
@@ -69,12 +77,16 @@ type UpdateUserType = {
     timePeriod?: string;
   }>;
 
-  skills?: string[];
+  skills?: Array<{
+    skillTile: string;
+    skillName: string[];
+  }>;
+  logo?: string;
 
   profilePicture?: string;
   cloudinaryId?: string;
+  logoCloudinaryId?: string; 
 };
-
 
 
 
@@ -110,86 +122,83 @@ export const getAdminProfile = asyncHandler(async (req: Request, res: Response) 
   res.json(generateResponse(true, safe, 'Admin profile fetched'));
 });
 
+// user.controller.ts
 export const updateMyProfile = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-
   if (!userId) {
     return res.status(httpStatus.UNAUTHORIZED).json(
       generateResponse(false, null, 'Unauthorized')
     );
   }
 
-  // Remove ALL manual JSON.parse() — Multer already did it!
-  const parsedBody = {
+  const rawBody = {
     ...req.body,
-    // These come as strings from frontend (FormData + JSON.stringify)
-    // But Multer + express.json() auto-parses them if sent correctly
-    socialLinks: req.body.socialLinks
-      ? typeof req.body.socialLinks === 'string'
-        ? JSON.parse(req.body.socialLinks)
-        : req.body.socialLinks
-      : undefined,
-
-    workExperience: req.body.workExperience
-      ? typeof req.body.workExperience === 'string'
-        ? JSON.parse(req.body.workExperience)
-        : req.body.workExperience
-      : undefined,
-
-    education: req.body.education
-      ? typeof req.body.education === 'string'
-        ? JSON.parse(req.body.education)
-        : req.body.education
-      : undefined,
-
-    skills: req.body.skills
-      ? typeof req.body.skills === 'string'
-        ? JSON.parse(req.body.skills)
-        : req.body.skills
-      : undefined,
+    socialLinks: safeParse(req.body.socialLinks),
+    workExperience: safeParse(req.body.workExperience),
+    education: safeParse(req.body.education),
+    skills: safeParse(req.body.skills),
+    logo: req.body.logo || undefined,
   };
 
-  // Now Zod works perfectly
-  const parseResult = updateProfileSchema.safeParse(parsedBody);
-
+  const parseResult = updateProfileSchema.safeParse(rawBody);
   if (!parseResult.success) {
     return res.status(400).json(
       generateResponse(false, null, parseResult.error.errors[0].message)
     );
   }
 
-  const updates:UpdateUserType = parseResult.data;
+  const updates: UpdateUserType = parseResult.data;
 
+  // Handle profile picture
+  if (req.files && (req.files as any)['profile']?.[0]) { // ← Type assertion fix
+    const file = (req.files as any)['profile'][0];
+    const current = await UserService.findById(userId).select('cloudinaryId').lean();
 
-  // Handle image upload
-  if (req.file) {
-
-    const currentUser = await UserService.findById(userId).select('cloudinaryId').lean();
-
-    if (currentUser?.cloudinaryId) {
-      await cloudinary.uploader.destroy(currentUser.cloudinaryId);
+    if (current?.cloudinaryId) {
+      await cloudinary.uploader.destroy(current.cloudinaryId);
     }
 
-    const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: 'profiles' },
-      async (error, result) => {
-        if (error || !result) {
-          return res.status(500).json(generateResponse(false, null, 'Image upload failed'));
-        }
-
-        updates.profilePicture = result.secure_url;
-        updates.cloudinaryId = result.public_id;
-
-        const updatedUser = await UserService.findByIdAndUpdate(userId, updates as Partial<IUser>);
-        return res.json(generateResponse(true, updatedUser, 'Profile updated successfully'));
-      }
-    );
-
-    uploadStream.end(req.file.buffer);
-    return;
+    const result = await uploadToCloudinary(file, 'profiles');
+    updates.profilePicture = result.secure_url;
+    updates.cloudinaryId = result.public_id;
   }
 
-  // Text-only update
+  // Handle logo
+  if (req.files && (req.files as any)['logo']?.[0]) { // ← Type assertion fix
+    const file = (req.files as any)['logo'][0];
+    const current = await UserService.findById(userId).select('logoCloudinaryId').lean();
+
+    if (current?.logoCloudinaryId) {
+      await cloudinary.uploader.destroy(current.logoCloudinaryId);
+    }
+
+    const result = await uploadToCloudinary(file, 'logos');
+    updates.logo = result.secure_url;
+    updates.logoCloudinaryId = result.public_id;
+  }
+
   const updatedUser = await UserService.findByIdAndUpdate(userId, updates as Partial<IUser>);
   res.json(generateResponse(true, updatedUser, 'Profile updated successfully'));
 });
+// Helper: Safe JSON parse
+function safeParse(value: any) {
+  if (!value) return undefined;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return value; }
+  }
+  return value;
+}
+
+// Helper: Upload to Cloudinary
+function uploadToCloudinary(file: Express.Multer.File, folder: string) {
+  return new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (error || !result) reject(error || new Error("Upload failed"));
+        else resolve({ secure_url: result.secure_url, public_id: result.public_id });
+      }
+    );
+    stream.end(file.buffer);
+  });
+}

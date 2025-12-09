@@ -7,6 +7,7 @@ export interface ISocialLink {
   icon?: string;
 }
 
+
 export interface IUser extends Document {
   name: string;
   email: string;
@@ -28,7 +29,12 @@ export interface IUser extends Document {
     degree: string;
     timePeriod: string;
   }[];
-  skills: string[];
+  skills: {
+    skillTile: string;
+    skillName: string[];
+  }[];
+  logo: string;
+  logoCloudinaryId?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -73,7 +79,12 @@ const UserSchema = new Schema<IUser>(
       },
     ],
 
-    skills: [String],
+    skills: [{
+      skillTile: { type: String },
+      skillName:[{ type: String }],
+    }],
+    logo: { type: String, default: '' },
+    logoCloudinaryId: { type: String },
   },
   { timestamps: true }
 );
