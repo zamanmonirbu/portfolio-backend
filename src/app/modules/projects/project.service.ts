@@ -1,27 +1,54 @@
+// project.service.ts
 import { Project } from './project.model';
 import { IProject, IProjectAttrs } from './project.model';
 
 export const ProjectService = {
   create(payload: IProjectAttrs) {
-    return Project.create(payload);
+    return Project.create(payload)
   },
 
-  list() {
-    return Project.find().sort({ createdAt: -1 }).limit(5).lean();
+  async list(page = 1, limit = 5) {
+    const skip = (page - 1) * limit
+
+    // Get total count for pagination
+    const totalProjects = await Project.countDocuments()
+
+    // Get paginated projects
+    const projects = await Project.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalProjects / limit)
+    const hasNextPage = page < totalPages
+    const hasPrevPage = page > 1
+
+    return {
+      projects,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalProjects,
+        limit,
+        hasNextPage,
+        hasPrevPage,
+      }
+    }
   },
 
   findById(id: string) {
-    return Project.findById(id).lean();
+    return Project.findById(id).lean()
   },
 
-  // ✅ FIXED update
   update(id: string, payload: Partial<IProjectAttrs>) {
-    return Project.findByIdAndUpdate(id, payload, { new: true }).lean();
+    return Project.findByIdAndUpdate(id, payload, { new: true }).lean()
   },
 
-  // ✅ FIXED delete
   async delete(id: string) {
-    const result = await Project.findByIdAndDelete(id).lean();
-    return result !== null;
+    const result = await Project.findByIdAndDelete(id).lean()
+    return result !== null
   },
-};
+}
+

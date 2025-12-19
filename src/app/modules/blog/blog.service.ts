@@ -8,8 +8,29 @@ export const BlogService = {
     return Blog.create({ ...payload, slug });
   },
 
-  list() {
-    return Blog.find().sort({ createdAt: -1 }).limit(5).lean();
+  // Updated list method with pagination
+  async list(page: number = 1, limit: number = 5) {
+    const skip = (page - 1) * limit;
+    const totalBlogs = await Blog.countDocuments();
+    const blogs = await Blog.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalPages = Math.ceil(totalBlogs / limit);
+
+    return {
+      blogs,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalBlogs,
+        limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   },
 
   findById(id: string) {

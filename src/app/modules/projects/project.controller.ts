@@ -262,11 +262,16 @@ export const deleteProject = asyncHandler(
 // --------------------
 // LIST PROJECTS
 // --------------------
+// project.controller.ts
 export const listProjects = asyncHandler(
-  async (_req: Request, res: Response) => {
-    const projects = await ProjectService.list()
+  async (req: Request, res: Response) => {
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 5
+
+    const result = await ProjectService.list(page, limit)
+
     res.json(
-      generateResponse(true, projects, "Projects fetched")
+      generateResponse(true, result, "Projects fetched successfully")
     )
   }
 )

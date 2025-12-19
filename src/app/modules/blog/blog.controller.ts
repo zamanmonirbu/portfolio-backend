@@ -45,10 +45,14 @@ export const createBlog = asyncHandler(async (req: Request, res: Response) => {
   stream.end(req.file.buffer);
 });
 
-export const listBlogs = asyncHandler(async (_req: Request, res: Response) => {
-  const blogs = await BlogService.list();
-  res.json(generateResponse(true, blogs, "Blogs fetched"));
+export const listBlogs = asyncHandler(async (req: Request, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 5;
+
+  const blogsData = await BlogService.list(page, limit);
+  res.json(generateResponse(true, blogsData, "Blogs fetched"));
 });
+
 
 export const getBlog = asyncHandler(async (req: Request, res: Response) => {
   const blog = await BlogService.findByIdAndIncrement(req.params.id);
